@@ -1,90 +1,52 @@
 import docker
 import time
-import ipaddress
-import netifaces
-
-
-def get_host_network_info():
-    gateways = netifaces.gateways()
-    default_interface = gateways['default'][netifaces.AF_INET][1]
-    interface_info = netifaces.ifaddresses(default_interface)[netifaces.AF_INET][0]
-    ip = interface_info['addr']
-    netmask = interface_info['netmask']
-    network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
-    return str(network), default_interface
-
-def create_ipvlan_network(client, network_name, subnet, parent_interface):
-    try:
-        return client.networks.get(network_name)
-    except docker.errors.NotFound:
-        return client.networks.create(
-            network_name,
-            driver="ipvlan",
-            ipam=docker.types.IPAMConfig(
-                pool_configs=[docker.types.IPAMPool(subnet=subnet)]
-            ),
-            options={
-                "ipvlan_mode": "l2",
-                "parent": parent_interface
-            }
-        )
 
 def create_ubuntu_ssh_container():
-    client = docker.from_env(timeout=180)
-
-    # 호스트 네트워크 정보 가져오기
-    host_subnet, parent_interface = get_host_network_info()
-    network_name = "ipvlan_network"
-
-    print("Host subnet:", host_subnet)
-    print("Parent interface:", parent_interface)
-
-    # IPvlan 네트워크 생성
-    network = create_ipvlan_network(client, network_name, host_subnet, parent_interface)
+    client = docker.from_env()
 
     print("Pulling Ubuntu image...")
     client.images.pull('ubuntu:latest')
 
     print("Creating and starting Ubuntu container...")
-    try:
-        container = client.containers.run(
-            'ubuntu:latest',
-            name='ubuntu-ssh',
-            detach=True,
-            tty=True,
-            network=network_name,
-            command="/bin/bash"
-        )
-    except docker.errors.APIError as e:
-        print(f"Error creating container: {e}")
-        raise
+    container = client.containers.run(
+        'ubuntu:latest',
+        name='ubuntu-ssh',
+        detach=True,
+        tty=True,
+        ports={'22/tcp': None},
+        command="/bin/bash"
+    )
 
     print("Installing and configuring SSH...")
     container.exec_run("apt-get update")
     container.exec_run("apt-get install -y openssh-server")
     container.exec_run("mkdir /var/run/sshd")
 
-    # SSH 설정
+    # 명시적인 비밀번호 설정
     password = "TestPassword123!"
-    container.exec_run(f"bash -c \"echo 'root:{password}' | chpasswd\"")
+    result = container.exec_run(f"bash -c \"echo 'root:{password}' | chpasswd\"")
+    print("Password set result:", result.output.decode())
+
+    # SSH 설정 수정
     container.exec_run("sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config")
     container.exec_run("sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config")
 
     print("Starting SSH service...")
     container.exec_run("/usr/sbin/sshd")
 
-    # 컨테이너 IP 주소 가져오기
-    container.reload()
-    container_ip = container.attrs['NetworkSettings']['Networks'][network_name]['IPAddress']
+    container_info = client.api.inspect_container(container.id)
+    ip_address = container_info['NetworkSettings']['IPAddress']
+    port_info = container_info['NetworkSettings']['Ports']['22/tcp'][0]
+    host_port = port_info['HostPort']
 
     print(f"\nContainer '{container.name}' is ready.")
-    print(f"Container IP: {container_ip}")
-    print(f"SSH Port: 22")
+    print(f"Container IP: {ip_address}")
+    print(f"SSH Port on Host: {host_port}")
     print(f"You can now connect via SSH using:")
-    print(f"ssh root@{container_ip}")
+    print(f"ssh root@localhost -p {host_port}")
     print(f"Password: {password}")
 
-    return container, container_ip, 22
+    return container, ip_address, host_port
 
 
 if __name__ == "__main__":
