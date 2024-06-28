@@ -6,6 +6,7 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 
+GET_IP_FAILED = "Error: Unable to get IP"
 
 def initialize_driver(url):
     chrome_options = Options()
@@ -128,7 +129,7 @@ def get_public_ip():
                 return response.text.strip()
         except requests.RequestException:
             continue
-    return "Error: Unable to get IP"
+    return GET_IP_FAILED
 
 
 def create_ubuntu_ssh_container():
@@ -181,6 +182,11 @@ def create_ubuntu_ssh_container():
 
 if __name__ == "__main__":
     public_ip = get_public_ip()
+
+    if public_ip == GET_IP_FAILED:
+        print("Failed to get public IP address.")
+        exit(1)
+
     private_ip, gateway_ip, interface = get_network_info()
 
     password = input("Enter the password for the gateway:")
