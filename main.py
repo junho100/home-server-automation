@@ -9,6 +9,7 @@ from selenium.webdriver.common.by import By
 
 def initialize_driver(url):
     chrome_options = Options()
+    chrome_options.add_argument("--headless")
     chrome_options.add_experimental_option("detach", True)
 
     driver = webdriver.Chrome(options=chrome_options)
