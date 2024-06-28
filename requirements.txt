@@ -2,3 +2,4 @@ selenium
 docker
 cryptography
 netifaces
+requests
