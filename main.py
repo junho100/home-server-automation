@@ -12,13 +12,18 @@ def initialize_driver(url):
     chrome_options.add_argument("--headless")
     chrome_options.add_experimental_option("detach", True)
 
-    driver = webdriver.Chrome(options=chrome_options)
+    try:
+        driver = webdriver.Chrome(options=chrome_options)
 
-    driver.implicitly_wait(3)
+        driver.implicitly_wait(3)
 
-    driver.get(url=url)
+        driver.get(url=url)
 
-    return driver
+        return driver
+    except Exception as e:
+        print("An error occurred while initializing the driver.")
+        print(e)
+        exit(1)
 
 
 def create_port_forwarding(url, password, private_ip, port):
