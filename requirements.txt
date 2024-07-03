@@ -3,3 +3,5 @@ docker
 cryptography
 netifaces
 requests
+flask
+waitress
