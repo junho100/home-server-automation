@@ -5,7 +5,23 @@ import time
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from flask import Flask, send_file
+import threading
+import os
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.backends import default_backend
+import socket
+from waitress.server import create_server
 
+
+app = Flask(__name__)
+
+PRIVATE_KEY_PATH = 'ubuntu_ssh_key.pem'
+public_key : bytes
+download_count = 0
+server_thread = None
+stop_server = threading.Event()
 GET_IP_FAILED = "Error: Unable to get IP"
 
 def initialize_driver(url):
@@ -26,8 +42,61 @@ def initialize_driver(url):
         print(e)
         exit(1)
 
+def generate_ssh_key():
+    global public_key
+    key = rsa.generate_private_key(
+        backend=default_backend(),
+        public_exponent=65537,
+        key_size=2048
+    )
 
-def create_port_forwarding(url, password, private_ip, port):
+    private_key = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+
+    public_key = key.public_key().public_bytes(
+        encoding=serialization.Encoding.OpenSSH,
+        format=serialization.PublicFormat.OpenSSH
+    )
+
+    with open(PRIVATE_KEY_PATH, 'wb') as key_file:
+        key_file.write(private_key)
+    os.chmod(PRIVATE_KEY_PATH, 0o600)
+
+    return private_key, public_key
+
+@app.route('/download_key')
+def download_key():
+    global download_count
+    if download_count == 0:
+        download_count += 1
+        return send_file(PRIVATE_KEY_PATH, as_attachment=True)
+    else:
+        return "Key has already been downloaded", 403
+
+
+def find_available_port(start_port=5000, max_port=65535):
+    for port in range(start_port, max_port + 1):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            try:
+                s.bind(('localhost', port))
+                return port
+            except socket.error:
+                continue
+    raise IOError("No free ports")
+
+def run_flask_server(port):
+    def shutdown_server():
+        server = create_server(app, host='0.0.0.0', port=port)
+        threading.Thread(target=server.run).start()
+        stop_server.wait()
+        server.close()
+
+    shutdown_server()
+
+def create_port_forwarding(url, password, private_ip, port, server_port):
     driver = initialize_driver(url)
 
     password_input = driver.find_element(By.XPATH, "//*[@type='password']")
@@ -63,6 +132,24 @@ def create_port_forwarding(url, password, private_ip, port):
 
     ex_port.send_keys(port)
     in_port.send_keys(port)
+
+    driver.find_element(By.XPATH, '//*[@id="port-forwarding-grid-save-button"]/div[2]/div[1]/a').click()
+
+    add_btn.click()
+
+    server_name = driver.find_element(By.XPATH,
+                                      '//*[@label-field="{PORT_FORWARDING.SERVICE_NAME}"]/div[2]/div[1]/span[2]/input')
+    server_name.send_keys("key")
+
+    ip = driver.find_element(By.XPATH,
+                             '//*[@label-field="{PORT_FORWARDING.DEVICE_IP_ADDRESS}"]/div[2]/div[1]/span[2]/input')
+    ip.send_keys(private_ip)
+
+    ex_port = driver.find_element(By.XPATH, '//*[@id="port-forwarding-external-port"]/div[2]/div[1]/span[2]/input')
+    in_port = driver.find_element(By.XPATH, '//*[@id="port-forwarding-internal-port"]/div[2]/div[1]/span[2]/input')
+
+    ex_port.send_keys(server_port)
+    in_port.send_keys(server_port)
 
     driver.find_element(By.XPATH, '//*[@id="port-forwarding-grid-save-button"]/div[2]/div[1]/a').click()
 
@@ -151,19 +238,40 @@ def create_ubuntu_ssh_container():
     print("Installing and configuring SSH...")
     container.exec_run("apt-get update")
     container.exec_run("apt-get install -y openssh-server")
-    container.exec_run("mkdir /var/run/sshd")
+    container.exec_run("mkdir -p /var/run/sshd")
+    container.exec_run("mkdir -p /root/.ssh")
 
-    # 명시적인 비밀번호 설정
-    password = "TestPassword123!"
-    result = container.exec_run(f"bash -c \"echo 'root:{password}' | chpasswd\"")
-    print("Password set result:", result.output.decode())
+    # authorized_keys 파일 생성 및 공개 키 추가
+    container.exec_run("touch /root/.ssh/authorized_keys")
+    container.exec_run(["sh", "-c", f"echo '{public_key.decode()}' > /root/.ssh/authorized_keys"])
+
+    # Set correct permissions
+    container.exec_run("chmod 700 /root/.ssh")
+    container.exec_run("chmod 600 /root/.ssh/authorized_keys")
 
     # SSH 설정 수정
-    container.exec_run("sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config")
-    container.exec_run("sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config")
+    container.exec_run(
+        "sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config")
+    container.exec_run("sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config")
+    container.exec_run("sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config")
 
     print("Starting SSH service...")
-    container.exec_run("/usr/sbin/sshd")
+    container.exec_run("service ssh restart")
+
+    # 디버깅을 위한 로그 확인
+    print("Checking SSH configuration:")
+    print(container.exec_run("grep PasswordAuthentication /etc/ssh/sshd_config").output.decode())
+    print(container.exec_run("grep PubkeyAuthentication /etc/ssh/sshd_config").output.decode())
+    print(container.exec_run("grep PermitRootLogin /etc/ssh/sshd_config").output.decode())
+
+    print("\nChecking authorized_keys:")
+    print(container.exec_run("cat /root/.ssh/authorized_keys").output.decode())
+
+    print("\nChecking permissions:")
+    print(container.exec_run("ls -la /root/.ssh").output.decode())
+
+    print("\nChecking SSH service status:")
+    print(container.exec_run("service ssh status").output.decode())
 
     container_info = client.api.inspect_container(container.id)
     ip_address = container_info['NetworkSettings']['IPAddress']
@@ -173,15 +281,16 @@ def create_ubuntu_ssh_container():
     print(f"\nContainer '{container.name}' is ready.")
     print(f"Container IP: {ip_address}")
     print(f"SSH Port on Host: {host_port}")
-    print(f"You can now connect via SSH using:")
-    print(f"ssh root@localhost -p {host_port}")
-    print(f"Password: {password}")
+    print(f"After downloading, you can connect via SSH using:")
+    print(f"ssh -i {PRIVATE_KEY_PATH} root@localhost -p {host_port}")
 
     return container, ip_address, host_port
 
 
 if __name__ == "__main__":
+    generate_ssh_key()
     public_ip = get_public_ip()
+
 
     if public_ip == GET_IP_FAILED:
         print("Failed to get public IP address.")
@@ -190,9 +299,20 @@ if __name__ == "__main__":
     private_ip, gateway_ip, interface = get_network_info()
 
     password = input("Enter the password for the gateway:")
+
+    server_port = find_available_port()
+    print(f"Flask server will run on port: {server_port}")
+    # Flask 서버 시작
+    server_thread = threading.Thread(target=run_flask_server, args=(server_port,))
+    server_thread.start()
+
+    print(f"You can now download the private key from: http://{public_ip}:{server_port}/download_key")
+
     container, ip, port = create_ubuntu_ssh_container()
     gateway_manager_url = f"http://{gateway_ip}"
-    create_port_forwarding(gateway_manager_url, password, private_ip, port)
+
+
+    create_port_forwarding(gateway_manager_url, password, private_ip, port, server_port)
     print("\nContainer is running. Press Ctrl+C to stop and remove the container.")
     print(f"Connect to the container via SSH using: ssh root@{public_ip} -p {port}")
     try:
@@ -204,3 +324,10 @@ if __name__ == "__main__":
         container.stop()
         container.remove()
         print("Container stopped and removed.")
+
+        print("Cleaning up...")
+        os.remove(PRIVATE_KEY_PATH)
+        print("Private key file removed.")
+
+        print("Exiting program...")
+        os._exit(0)
