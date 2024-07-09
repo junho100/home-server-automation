@@ -17,7 +17,7 @@ stop_server = threading.Event()
 GET_IP_FAILED = "Error: Unable to get IP"
 PRIVATE_KEY_PATH = 'ubuntu_ssh_key.pem'
 
-@app.route('/crypto')
+@app.route('/key')
 def download_key():
     global download_count
     if download_count == 0:
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_flask_server, args=(server_port,))
     server_thread.start()
 
-    print(f"You can now download the private crypto from: http://{public_ip}:{server_port}/crypto")
+    print(f"You can now download the private crypto from: http://{public_ip}:{server_port}/key")
 
     print("Creating and starting Ubuntu docker...")
     container, ip, port = create_ubuntu_ssh_container(public_key)
