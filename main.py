@@ -11,7 +11,6 @@ from docker import create_ubuntu_ssh_container
 
 app = Flask(__name__)
 
-public_key : bytes
 download_count = 0
 server_thread = None
 stop_server = threading.Event()
