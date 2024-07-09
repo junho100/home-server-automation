@@ -13,7 +13,8 @@ def create_ubuntu_ssh_container(ssh_public_key):
         detach=True,
         tty=True,
         ports={'22/tcp': None},
-        command="/bin/bash"
+        command="/bin/bash",
+        privileged=True
     )
 
     print("Installing and configuring SSH...")

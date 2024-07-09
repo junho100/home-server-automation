@@ -36,10 +36,11 @@ def create_port_forwarding(url, password, private_ip, port, server_port):
 
     parent_element2 = driver.find_element(By.CSS_SELECTOR, '[navi-value="nat"]')
     parent_element2.click()
+
     port_forwarding_nav = parent_element2.find_element(By.CSS_SELECTOR, '[navi-value="portForwarding"]')
     port_forwarding_nav.click()
 
-    add_btn = driver.find_element(By.CSS_SELECTOR, 'div#port-forwarding-grid_bar.operation-docker')
+    add_btn = driver.find_element(By.CSS_SELECTOR, 'div#port-forwarding-grid_bar.operation-container')
     add_btn.click()
 
     server_name = driver.find_element(By.XPATH,

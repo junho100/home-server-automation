@@ -1,1 +1,1 @@
-from ssh import generate_ssh_key
+from .ssh import generate_ssh_key
