@@ -65,9 +65,9 @@ def generate_ssh_key():
         key_file.write(private_key)
     os.chmod(PRIVATE_KEY_PATH, 0o600)
 
-    return private_key, public_key
+    return public_key
 
-@app.route('/download_key')
+@app.route('/key')
 def download_key():
     global download_count
     if download_count == 0:
@@ -169,7 +169,7 @@ def get_network_info():
     interface_info = netifaces.ifaddresses(default_interface)
     private_ip = interface_info[netifaces.AF_INET][0]['addr']
 
-    return private_ip, gateway_ip, default_interface
+    return private_ip, gateway_ip
 
 
 def delete_port_forwarding(url, password):
@@ -219,7 +219,7 @@ def get_public_ip():
     return GET_IP_FAILED
 
 
-def create_ubuntu_ssh_container():
+def create_ubuntu_ssh_container(ssh_public_key):
     client = docker.from_env()
 
     print("Pulling Ubuntu image...")
@@ -243,7 +243,7 @@ def create_ubuntu_ssh_container():
 
     # authorized_keys 파일 생성 및 공개 키 추가
     container.exec_run("touch /root/.ssh/authorized_keys")
-    container.exec_run(["sh", "-c", f"echo '{public_key.decode()}' > /root/.ssh/authorized_keys"])
+    container.exec_run(["sh", "-c", f"echo '{ssh_public_key.decode()}' > /root/.ssh/authorized_keys"])
 
     # Set correct permissions
     container.exec_run("chmod 700 /root/.ssh")
@@ -258,21 +258,6 @@ def create_ubuntu_ssh_container():
     print("Starting SSH service...")
     container.exec_run("service ssh restart")
 
-    # 디버깅을 위한 로그 확인
-    print("Checking SSH configuration:")
-    print(container.exec_run("grep PasswordAuthentication /etc/ssh/sshd_config").output.decode())
-    print(container.exec_run("grep PubkeyAuthentication /etc/ssh/sshd_config").output.decode())
-    print(container.exec_run("grep PermitRootLogin /etc/ssh/sshd_config").output.decode())
-
-    print("\nChecking authorized_keys:")
-    print(container.exec_run("cat /root/.ssh/authorized_keys").output.decode())
-
-    print("\nChecking permissions:")
-    print(container.exec_run("ls -la /root/.ssh").output.decode())
-
-    print("\nChecking SSH service status:")
-    print(container.exec_run("service ssh status").output.decode())
-
     container_info = client.api.inspect_container(container.id)
     ip_address = container_info['NetworkSettings']['IPAddress']
     port_info = container_info['NetworkSettings']['Ports']['22/tcp'][0]
@@ -281,44 +266,49 @@ def create_ubuntu_ssh_container():
     print(f"\nContainer '{container.name}' is ready.")
     print(f"Container IP: {ip_address}")
     print(f"SSH Port on Host: {host_port}")
-    print(f"After downloading, you can connect via SSH using:")
-    print(f"ssh -i {PRIVATE_KEY_PATH} root@localhost -p {host_port}")
 
     return container, ip_address, host_port
 
 
 if __name__ == "__main__":
-    generate_ssh_key()
-    public_ip = get_public_ip()
+    password = input("Enter the password for the gateway:")
 
+    print("Getting network information...")
+    public_ip = get_public_ip()
 
     if public_ip == GET_IP_FAILED:
         print("Failed to get public IP address.")
         exit(1)
 
-    private_ip, gateway_ip, interface = get_network_info()
+    print("Generating SSH key...")
+    public_key = generate_ssh_key()
 
-    password = input("Enter the password for the gateway:")
+    print("Getting network information...")
+    private_ip, gateway_ip = get_network_info()
 
+    print("Finding available port...")
     server_port = find_available_port()
+
     print(f"Flask server will run on port: {server_port}")
     # Flask 서버 시작
     server_thread = threading.Thread(target=run_flask_server, args=(server_port,))
     server_thread.start()
 
-    print(f"You can now download the private key from: http://{public_ip}:{server_port}/download_key")
+    print(f"You can now download the private key from: http://{public_ip}:{server_port}/key")
 
-    container, ip, port = create_ubuntu_ssh_container()
+    print("Creating and starting Ubuntu container...")
+    container, ip, port = create_ubuntu_ssh_container(public_key)
     gateway_manager_url = f"http://{gateway_ip}"
 
-
+    print("Creating port forwarding rules...")
     create_port_forwarding(gateway_manager_url, password, private_ip, port, server_port)
     print("\nContainer is running. Press Ctrl+C to stop and remove the container.")
-    print(f"Connect to the container via SSH using: ssh root@{public_ip} -p {port}")
+    print(f"Connect to the container via SSH using: ssh -i {PRIVATE_KEY_PATH} root@{public_ip} -p {port}")
     try:
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
+        print("\nCleaning up...")
         delete_port_forwarding(gateway_manager_url, password)
         print("\nStopping and removing container...")
         container.stop()
