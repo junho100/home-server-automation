@@ -1,5 +1,6 @@
 import docker
 
+
 def create_ubuntu_ssh_container(ssh_public_key):
     client = docker.from_env()
 
@@ -15,26 +16,33 @@ def create_ubuntu_ssh_container(ssh_public_key):
         ports={'22/tcp': None},
         command="/bin/bash",
         mem_limit='6g',
-        volumes={"custom" : {'bind': "/home/custom-user", 'mode': 'rw'}},
+        volumes={"ubuntu_home": {'bind': "/home/ubuntu", 'mode': 'rw'}},
     )
 
     print("Installing and configuring SSH...")
     container.exec_run("apt-get update")
-    container.exec_run("apt-get install -y openssh-server")
+    container.exec_run("apt-get install -y openssh-server sudo")
     container.exec_run("mkdir -p /var/run/sshd")
-    container.exec_run("mkdir -p /root/.ssh")
 
-    # authorized_keys 파일 생성 및 공개 키 추가
-    container.exec_run("touch /root/.ssh/authorized_keys")
-    container.exec_run(["sh", "-c", f"echo '{ssh_public_key.decode()}' > /root/.ssh/authorized_keys"])
+    # 'ubuntu' 사용자 생성
+    container.exec_run("useradd -m -d /home/ubuntu -s /bin/bash ubuntu")
+    container.exec_run("chown -R ubuntu:ubuntu /home/ubuntu")
 
-    # Set correct permissions
-    container.exec_run("chmod 700 /root/.ssh")
-    container.exec_run("chmod 600 /root/.ssh/authorized_keys")
+    # sudo 권한 부여 및 비밀번호 없이 root로 전환 가능하게 설정
+    container.exec_run("bash -c \"echo 'ubuntu ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/ubuntu && chmod 0440 /etc/sudoers.d/ubuntu\"")
+
+    # SSH 디렉토리 및 authorized_keys 파일 생성
+    container.exec_run("mkdir -p /home/ubuntu/.ssh")
+    container.exec_run("touch /home/ubuntu/.ssh/authorized_keys")
+    container.exec_run(["sh", "-c", f"echo '{ssh_public_key.decode()}' > /home/ubuntu/.ssh/authorized_keys"])
+
+    # 권한 설정
+    container.exec_run("chown -R ubuntu:ubuntu /home/ubuntu/.ssh")
+    container.exec_run("chmod 700 /home/ubuntu/.ssh")
+    container.exec_run("chmod 600 /home/ubuntu/.ssh/authorized_keys")
 
     # SSH 설정 수정
-    container.exec_run(
-        "sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config")
+    container.exec_run("sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config")
     container.exec_run("sed -i 's/#PubkeyAuthentication yes/PubkeyAuthentication yes/' /etc/ssh/sshd_config")
     container.exec_run("sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config")
 

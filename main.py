@@ -67,7 +67,7 @@ if __name__ == "__main__":
     print("Creating port forwarding rules...")
     create_port_forwarding(gateway_manager_url, password, private_ip, port, server_port)
     print("\nContainer is running. Press Ctrl+C to stop and remove the docker.")
-    print(f"Connect to the docker via SSH using: ssh -i {PRIVATE_KEY_PATH} root@{public_ip} -p {port}")
+    print(f"Connect to the docker via SSH using: ssh -i {PRIVATE_KEY_PATH} ubuntu@{public_ip} -p {port}")
     try:
         while True:
             time.sleep(1)
