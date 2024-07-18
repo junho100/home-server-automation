@@ -14,7 +14,8 @@ def create_ubuntu_ssh_container(ssh_public_key):
         tty=True,
         ports={'22/tcp': None},
         command="/bin/bash",
-        privileged=True
+        mem_limit='6g',
+        volumes={"custom" : {'bind': "/home/custom-user", 'mode': 'rw'}},
     )
 
     print("Installing and configuring SSH...")
