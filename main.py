@@ -6,7 +6,6 @@ import time
 
 from network.ip import get_public_ip, get_network_info, find_available_port
 from network.mercusys_port_forwarding_class import MercusysPortForwarding
-from network.port_forwarding import create_port_forwarding, delete_port_forwarding
 from crypto.ssh import generate_ssh_key
 from container_vm import create_ubuntu_ssh_container
 
@@ -75,7 +74,7 @@ if __name__ == "__main__":
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nCleaning up...")
-        delete_port_forwarding(gateway_manager_url, password)
+        port_forwarding.delete_port_forwarding(password)
         print("\nStopping and removing docker...")
         container.stop()
         container.remove()
