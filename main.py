@@ -5,6 +5,7 @@ from waitress.server import create_server
 import time
 
 from network.ip import get_public_ip, get_network_info, find_available_port
+from network.mercusys_port_forwarding_class import MercusysPortForwarding
 from network.port_forwarding import create_port_forwarding, delete_port_forwarding
 from crypto.ssh import generate_ssh_key
 from container_vm import create_ubuntu_ssh_container
@@ -65,7 +66,8 @@ if __name__ == "__main__":
     gateway_manager_url = f"http://{gateway_ip}"
 
     print("Creating port forwarding rules...")
-    create_port_forwarding(gateway_manager_url, password, private_ip, port, server_port)
+    port_forwarding = MercusysPortForwarding(gateway_manager_url)
+    port_forwarding.create_port_forwarding(password, private_ip, port, server_port)
     print("\nContainer is running. Press Ctrl+C to stop and remove the docker.")
     print(f"Connect to the docker via SSH using: ssh -i {PRIVATE_KEY_PATH} ubuntu@{public_ip} -p {port}")
     try:
