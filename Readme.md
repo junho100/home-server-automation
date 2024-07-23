@@ -20,6 +20,18 @@ Setting up home server automatically using container.
 - Flask 3.0.3
 - Ubuntu 24.04
 
+## Installation
+1. create python virtual environment
+```commandline
+python -m venv venv
+source venv/bin/activate
+```
+
+2. install required packages
+```commandline
+pip3 install -e .
+```
+
 ## How to use
 
 ```commandline
