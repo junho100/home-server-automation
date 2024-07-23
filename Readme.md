@@ -20,6 +20,10 @@ Setting up home server automatically using container.
 - Flask 3.0.3
 - Ubuntu 24.04
 
+## Supported Router
+
+- Mercusys
+
 ## Installation
 1. create python virtual environment
 ```commandline
