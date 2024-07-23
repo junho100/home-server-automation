@@ -9,7 +9,7 @@ class MercusysPortForwarding(BasePortForwarding):
         super().__init__(url)
 
     def create_port_forwarding(self, password, private_ip, port, server_port):
-        driver = self.driver
+        driver = self._initialize_driver()
 
         password_input = driver.find_element(By.XPATH, "//*[@type='password']")
 
@@ -69,7 +69,9 @@ class MercusysPortForwarding(BasePortForwarding):
         driver.quit()
 
     def delete_port_forwarding(self, password):
-        driver = self.driver
+        driver = self._initialize_driver()
+
+        driver.get(url=self.url)
 
         password_input = driver.find_element(By.XPATH, "//*[@type='password']")
 

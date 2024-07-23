@@ -7,7 +7,6 @@ class BasePortForwarding:
 
     def __init__(self, url):
         self.url = url
-        self.driver = self._initialize_driver()
 
     def _initialize_driver(self):
         chrome_options = Options()

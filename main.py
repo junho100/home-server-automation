@@ -3,6 +3,7 @@ import threading
 import os
 from waitress.server import create_server
 import time
+import getpass
 
 from network.ip import get_public_ip, get_network_info, find_available_port
 from network.mercusys_port_forwarding_class import MercusysPortForwarding
@@ -36,7 +37,7 @@ def run_flask_server(port):
     shutdown_server()
 
 if __name__ == "__main__":
-    password = input("Enter the password for the gateway:")
+    password = getpass.getpass("Enter the password for the gateway:")
 
     print("Getting network information...")
     public_ip = get_public_ip()
