@@ -57,22 +57,16 @@ class MercusysPortForwarding(BasePortForwarding):
 
         driver.get(url=self.url)
 
-        password_input = driver.find_element(By.XPATH, "//*[@type='password']")
+        driver.find_element(By.XPATH, "//*[@type='password']").send_keys(password)
 
-        password_input.send_keys(password)
+        driver.find_element(By.XPATH, "//*[@title='LOG IN']").click()
 
-        btn = driver.find_element(By.XPATH, "//*[@title='LOG IN']")
+        advanced_nav_parent_element = driver.find_element(By.CSS_SELECTOR, '[navi-value="advanced"]')
+        advanced_nav_parent_element.find_element(By.TAG_NAME, "a").click()
 
-        btn.click()
-
-        parent_element = driver.find_element(By.CSS_SELECTOR, '[navi-value="advanced"]')
-        advanced_nav = parent_element.find_element(By.TAG_NAME, "a")
-        advanced_nav.click()
-
-        parent_element2 = driver.find_element(By.CSS_SELECTOR, '[navi-value="nat"]')
-        parent_element2.click()
-        port_forwarding_nav = parent_element2.find_element(By.CSS_SELECTOR, '[navi-value="portForwarding"]')
-        port_forwarding_nav.click()
+        nat_nav_parent_element = driver.find_element(By.CSS_SELECTOR, '[navi-value="nat"]')
+        nat_nav_parent_element.click()
+        nat_nav_parent_element.find_element(By.CSS_SELECTOR, '[navi-value="portForwarding"]').click()
 
         delete_btns = driver.find_elements(By.XPATH,
                                            '//a[@class="grid-content-btn grid-content-btn-delete btn-delete"]')
