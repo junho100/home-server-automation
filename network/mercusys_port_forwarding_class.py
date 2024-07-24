@@ -6,17 +6,17 @@ from selenium.webdriver.common.by import By
 from network.base_port_forwarding_class import BasePortForwarding
 
 class SELECTORS(Enum):
-    X_PATH_PASSWORD_INPUT = "//*[@type='password']",
-    X_PATH_LOGIN_BTN = "//*[@title='LOG IN']",
-    CSS_ADVANCED_NAV_PARENT = '[navi-value="advanced"]',
-    CSS_NAT_NAV_PARENT = '[navi-value="nat"]',
-    CSS_PORT_FORWARDING_NAV = '[navi-value="portForwarding"]',
-    CSS_ADD_BTN = 'div#port-forwarding-grid_bar.operation-container',
-    X_PATH_SERVICE_NAME_INPUT = '//*[@label-field="{PORT_FORWARDING.SERVICE_NAME}"]/div[2]/div[1]/span[2]/input',
-    X_PATH_DEVICE_IP_INPUT = '//*[@label-field="{PORT_FORWARDING.DEVICE_IP_ADDRESS}"]/div[2]/div[1]/span[2]/input',
-    X_PATH_EXTERNAL_PORT_INPUT = '//*[@id="port-forwarding-external-port"]/div[2]/div[1]/span[2]/input',
-    X_PATH_INTERNAL_PORT_INPUT = '//*[@id="port-forwarding-internal-port"]/div[2]/div[1]/span[2]/input',
-    X_PATH_SAVE_BTN = '//*[@id="port-forwarding-grid-save-button"]/div[2]/div[1]/a',
+    X_PATH_PASSWORD_INPUT = "//*[@type='password']"
+    X_PATH_LOGIN_BTN = "//*[@title='LOG IN']"
+    CSS_ADVANCED_NAV_PARENT = '[navi-value="advanced"]'
+    CSS_NAT_NAV_PARENT = '[navi-value="nat"]'
+    CSS_PORT_FORWARDING_NAV = '[navi-value="portForwarding"]'
+    CSS_ADD_BTN = 'div#port-forwarding-grid_bar.operation-container'
+    X_PATH_SERVICE_NAME_INPUT = '//*[@label-field="{PORT_FORWARDING.SERVICE_NAME}"]/div[2]/div[1]/span[2]/input'
+    X_PATH_DEVICE_IP_INPUT = '//*[@label-field="{PORT_FORWARDING.DEVICE_IP_ADDRESS}"]/div[2]/div[1]/span[2]/input'
+    X_PATH_EXTERNAL_PORT_INPUT = '//*[@id="port-forwarding-external-port"]/div[2]/div[1]/span[2]/input'
+    X_PATH_INTERNAL_PORT_INPUT = '//*[@id="port-forwarding-internal-port"]/div[2]/div[1]/span[2]/input'
+    X_PATH_SAVE_BTN = '//*[@id="port-forwarding-grid-save-button"]/div[2]/div[1]/a'
     X_PATH_DELETE_BTN = '//a[@class="grid-content-btn grid-content-btn-delete btn-delete"]'
 
 
